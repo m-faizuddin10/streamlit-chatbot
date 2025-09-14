@@ -11,48 +11,91 @@ st.set_page_config(
 # ----------------- CUSTOM CSS -----------------
 st.markdown("""
     <style>
-        /* App background */
+        /* Main app background */
         .stApp {
-            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-            color: #F5F5F5;
+            background: #e3f2fd !important; /* sky blue */
+            color: #111111 !important;
+        }
+        /* Sidebar background and text */
+        section[data-testid="stSidebar"] {
+            background-color: #bbdefb !important; /* lighter sky blue */
+            color: #111111 !important;
+        }
+        /* Sidebar header and text */
+        .stSidebar h1, .stSidebar h2, .stSidebar h3, .stSidebar h4, .stSidebar h5, .stSidebar h6, .stSidebar p, .stSidebar label {
+            color: #111111 !important;
+        }
+        /* All containers and blocks */
+        .stContainer, .stMarkdown, .stTextInput, .stSelectbox, .stCheckbox, .stButton, .stChatMessage {
+            background-color: #e3f2fd !important; /* sky blue */
+            color: #111111 !important;
+        }
+        /* Chat message bubbles */
+        .stChatMessage.user {
+            background-color: #90caf9 !important; /* medium sky blue */
+            color: #111111 !important;
+            border-radius: 12px;
+            padding: 8px;
+        }
+        .stChatMessage.assistant {
+            background-color: #bbdefb !important; /* lighter sky blue */
+            color: #111111 !important;
+            border-radius: 12px;
+            padding: 8px;
         }
         /* Title */
         .title {
             text-align: center;
             font-size: 40px;
             font-weight: bold;
-            color: #00E5FF;
+            color: #111111;
         }
         /* Subtitle */
         .subtitle {
             text-align: center;
             font-size: 18px;
-            color: #B0BEC5;
+            color: #222222;
             margin-bottom: 30px;
         }
-        /* Chat message bubbles */
-        .stChatMessage.user {
-            background-color: #1E88E5 !important;
-            color: white !important;
-            border-radius: 12px;
-            padding: 8px;
-        }
-        .stChatMessage.assistant {
-            background-color: #263238 !important;
-            color: #ECEFF1 !important;
-            border-radius: 12px;
-            padding: 8px;
-        }
-        /* Sidebar styling */
-        .css-1d391kg, .css-18ni7ap {
-            background-color: #1C1C1C !important;
-        }
-        /* Buttons */
-        .stButton > button {
+        /* Buttons (main and sidebar) */
+        .stButton > button, section[data-testid="stSidebar"] .stButton > button {
             border-radius: 10px;
-            background-color: #FF5252;
-            color: white;
+            background-color: #90caf9 !important; /* medium sky blue */
+            color: #111111 !important;
             font-weight: bold;
+            border: 1px solid #64b5f6;
+            box-shadow: none !important;
+        }
+        /* Input box */
+        .stTextInput>div>div>input {
+            background-color: #e3f2fd !important;
+            color: #111111 !important;
+        }
+        /* Selectbox */
+        .stSelectbox>div>div>div {
+            background-color: #e3f2fd !important;
+            color: #111111 !important;
+        }
+        /* Checkbox */
+        .stCheckbox>div {
+            background-color: #e3f2fd !important;
+            color: #111111 !important;
+        }
+        /* Code block styling */
+        pre, code {
+            background-color: #ffffff !important;
+            color: #111111 !important;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 15px;
+            font-family: 'Fira Mono', 'Consolas', 'Monaco', monospace;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+            margin-bottom: 10px;
+            display: block;
+        }
+        /* Remove box shadows for a flat look */
+        .stButton > button, .stTextInput>div>div>input, .stSelectbox>div>div>div, .stCheckbox>div {
+            box-shadow: none !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -67,10 +110,14 @@ client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 # ----------------- SIDEBAR -----------------
 st.sidebar.header("⚙️ Settings")
 
-# Model selection
+# Model selection (only supported models)
 model_choice = st.sidebar.selectbox(
     "Choose AI Model:",
-    ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"],
+    [
+        "llama-3.1-8b-instant",       # ✅ Fast, cheaper
+        "llama-3.1-70b-versatile",    # ✅ More capable, larger
+        "gemma2-9b-it"                # ✅ Google Gemma-2 fine-tuned
+    ],
     index=0
 )
 
@@ -93,7 +140,10 @@ if "messages" not in st.session_state:
 # ----------------- DISPLAY CHAT HISTORY -----------------
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+        st.markdown(
+            f"<span style='color:#111111'>{message['content']}</span>",
+            unsafe_allow_html=True
+        )
 
 # ----------------- CHAT INPUT -----------------
 if prompt := st.chat_input("💬 Type your message here..."):
@@ -102,36 +152,67 @@ if prompt := st.chat_input("💬 Type your message here..."):
 
     # Show user bubble
     with st.chat_message("user"):
-        st.markdown(prompt)
+        st.markdown(
+            f"<span style='color:#111111'>{prompt}</span>",
+            unsafe_allow_html=True
+        )
 
     # Assistant reply
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         full_response = ""
 
-        if use_stream:
-            # Streamed response
-            stream = client.chat.completions.create(
-                model=model_choice,
-                messages=st.session_state.messages,
-                stream=True,
+        try:
+            if use_stream:
+                # Streamed response
+                stream = client.chat.completions.create(
+                    model=model_choice,
+                    messages=st.session_state.messages,
+                    stream=True,
+                )
+                for chunk in stream:
+                    delta = chunk.choices[0].delta.content or ""
+                    full_response += delta
+                    message_placeholder.markdown(
+                        f"<span style='color:#111111'>{full_response}▌</span>",
+                        unsafe_allow_html=True
+                    )
+                message_placeholder.markdown(
+                    f"<span style='color:#111111'>{full_response}</span>",
+                    unsafe_allow_html=True
+                )
+            else:
+                # Non-stream response
+                response = client.chat.completions.create(
+                    model=model_choice,
+                    messages=st.session_state.messages,
+                )
+                full_response = response.choices[0].message.content
+                message_placeholder.markdown(
+                    f"<span style='color:#111111'>{full_response}</span>",
+                    unsafe_allow_html=True
+                )
+
+        except Exception as e:
+            # fallback in case of model issues
+            full_response = f"⚠️ Error with model `{model_choice}`. Falling back to llama-3.1-8b-instant.\n\nError: {str(e)}"
+            try:
+                response = client.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    messages=st.session_state.messages,
+                )
+                full_response = response.choices[0].message.content
+            except Exception as inner_e:
+                full_response = f"❌ Could not generate a response. Error: {inner_e}"
+
+            message_placeholder.markdown(
+                f"<span style='color:#111111'>{full_response}</span>",
+                unsafe_allow_html=True
             )
-            for chunk in stream:
-                delta = chunk.choices[0].delta.content or ""
-                full_response += delta
-                message_placeholder.markdown(full_response + "▌")
-            message_placeholder.markdown(full_response)
-        else:
-            # Non-stream response
-            response = client.chat.completions.create(
-                model=model_choice,
-                messages=st.session_state.messages,
-            )
-            full_response = response.choices[0].message.content
-            message_placeholder.markdown(full_response)
 
     # Save assistant response
     st.session_state.messages.append({"role": "assistant", "content": full_response})
+
 
 
 
